@@ -31,8 +31,9 @@ export default function JobDetail() {
   if (!job) return <div className="p-10 text-muted-foreground">Loading…</div>;
 
   const canWork = ["admin","coordinator","technician","qa"].includes(user?.role);
-  const canSeeCommercials = ["admin","coordinator","customer"].includes(user?.role);
-  const canBuildQuote = ["admin","coordinator"].includes(user?.role);
+  const canSeeCommercials = ["admin","customer"].includes(user?.role);
+  const canBuildQuote = user?.role === "admin";
+  const canDecideQuote = ["admin","customer"].includes(user?.role);
   const isCust = user?.role === "customer";
 
   const act = async (path, body) => {
@@ -117,7 +118,7 @@ export default function JobDetail() {
             <AssessmentForm onSubmit={(v) => act("/assessment", v)} />
           )}
 
-          {job.quote && canSeeCommercials && <QuoteView quote={job.quote} onDecide={(d) => act("/quote/decide", d)} canDecide={isCust || ["admin","coordinator"].includes(user?.role)} />}
+          {job.quote && canSeeCommercials && <QuoteView quote={job.quote} onDecide={(d) => act("/quote/decide", d)} canDecide={canDecideQuote} />}
 
           {!job.quote && canBuildQuote && job.assessment?.outcome === "Repairable" && (
             <QuoteForm onSubmit={(v) => act("/quote", v)} />
@@ -156,9 +157,25 @@ export default function JobDetail() {
 
           {job.dispatch && (
             <Section title="Dispatch">
-              <div className="text-sm">
-                <div>{job.dispatch.courier} · <span className="mono">{job.dispatch.tracking_no}</span></div>
-                <div className="text-xs text-muted-foreground mt-1">{job.dispatch.delivery_notes}</div>
+              <div className="text-sm space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10.5px] uppercase tracking-widest text-muted-foreground">Method</span>
+                  <span className="font-medium">{job.dispatch.dispatch_method || "Courier"}</span>
+                </div>
+                {(job.dispatch.dispatch_method || "Courier") === "In Person" ? (
+                  <>
+                    <div>Delivered on <span className="mono">{job.dispatch.delivery_date || "—"}</span></div>
+                    <div>Received by <span className="font-medium">{job.dispatch.received_by || "—"}</span></div>
+                  </>
+                ) : (
+                  <div>{job.dispatch.courier} · <span className="mono">{job.dispatch.tracking_no}</span></div>
+                )}
+                {job.dispatch.delivery_notes && (
+                  <div className="text-xs text-muted-foreground mt-1">{job.dispatch.delivery_notes}</div>
+                )}
+                <div className="text-[10.5px] uppercase tracking-widest text-muted-foreground mono pt-2 border-t border-border">
+                  By {job.dispatch.by} · {new Date(job.dispatch.at).toLocaleString("en-SG")}
+                </div>
               </div>
             </Section>
           )}
@@ -376,17 +393,86 @@ function QAForm({ onSubmit }) {
 }
 
 function DispatchForm({ onSubmit }) {
-  const [f, setF] = useState({ courier: "DHL", tracking_no: "", delivery_notes: "" });
+  const today = new Date().toISOString().slice(0, 10);
+  const [f, setF] = useState({
+    dispatch_method: "Courier",
+    courier: "DHL", tracking_no: "",
+    delivery_date: today, received_by: "",
+    delivery_notes: "",
+  });
+  const isInPerson = f.dispatch_method === "In Person";
   return (
     <Section title="Dispatch">
-      <div className="grid grid-cols-2 gap-3">
-        <input value={f.courier} onChange={(e) => setF({...f, courier: e.target.value})} placeholder="Courier"
-          className="px-2 py-1.5 bg-muted/50 border border-border rounded text-sm" data-testid="dispatch-courier" />
-        <input value={f.tracking_no} onChange={(e) => setF({...f, tracking_no: e.target.value})} placeholder="Tracking No"
-          className="px-2 py-1.5 bg-muted/50 border border-border rounded font-mono text-sm" data-testid="dispatch-tracking" />
+      <div className="mb-3">
+        <label className="text-[10.5px] uppercase tracking-widest text-muted-foreground">Method</label>
+        <div className="grid grid-cols-2 gap-2 mt-1">
+          {["Courier","In Person"].map((m) => (
+            <button
+              key={m}
+              type="button"
+              data-testid={`dispatch-method-${m.replace(/\s+/g,'-').toLowerCase()}`}
+              onClick={() => setF({...f, dispatch_method: m})}
+              className={`py-2 text-sm rounded-md border transition-colors duration-100 ${
+                f.dispatch_method === m
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border hover:bg-muted"
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
       </div>
-      <button onClick={() => onSubmit(f)} data-testid="dispatch-submit"
-        className="mt-3 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm">Dispatch</button>
+
+      {isInPerson ? (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10.5px] uppercase tracking-widest text-muted-foreground">Delivery date</label>
+            <input type="date" value={f.delivery_date} onChange={(e) => setF({...f, delivery_date: e.target.value})}
+              className="w-full mt-1 px-2 py-1.5 bg-muted/50 border border-border rounded font-mono text-sm"
+              data-testid="dispatch-date" />
+          </div>
+          <div>
+            <label className="text-[10.5px] uppercase tracking-widest text-muted-foreground">Received by</label>
+            <input value={f.received_by} onChange={(e) => setF({...f, received_by: e.target.value})}
+              placeholder="Full name of recipient"
+              className="w-full mt-1 px-2 py-1.5 bg-muted/50 border border-border rounded text-sm"
+              data-testid="dispatch-received-by" />
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10.5px] uppercase tracking-widest text-muted-foreground">Courier</label>
+            <input value={f.courier} onChange={(e) => setF({...f, courier: e.target.value})} placeholder="Courier"
+              className="w-full mt-1 px-2 py-1.5 bg-muted/50 border border-border rounded text-sm" data-testid="dispatch-courier" />
+          </div>
+          <div>
+            <label className="text-[10.5px] uppercase tracking-widest text-muted-foreground">Tracking No</label>
+            <input value={f.tracking_no} onChange={(e) => setF({...f, tracking_no: e.target.value})} placeholder="Tracking number"
+              className="w-full mt-1 px-2 py-1.5 bg-muted/50 border border-border rounded font-mono text-sm" data-testid="dispatch-tracking" />
+          </div>
+        </div>
+      )}
+
+      <textarea value={f.delivery_notes} onChange={(e) => setF({...f, delivery_notes: e.target.value})}
+        placeholder="Delivery notes (optional)" rows={2}
+        className="w-full mt-3 px-2 py-1.5 bg-muted/50 border border-border rounded text-sm" />
+
+      <button
+        onClick={() => onSubmit(isInPerson ? {
+          dispatch_method: "In Person",
+          delivery_date: f.delivery_date, received_by: f.received_by,
+          delivery_notes: f.delivery_notes,
+        } : {
+          dispatch_method: "Courier",
+          courier: f.courier, tracking_no: f.tracking_no,
+          delivery_notes: f.delivery_notes,
+        })}
+        data-testid="dispatch-submit"
+        className="mt-3 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm">
+        Confirm Dispatch
+      </button>
     </Section>
   );
 }

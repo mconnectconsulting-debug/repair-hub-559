@@ -214,8 +214,11 @@ class QAIn(BaseModel):
 
 
 class DispatchIn(BaseModel):
-    courier: str
-    tracking_no: str
+    dispatch_method: Literal["Courier", "In Person"] = "Courier"
+    courier: Optional[str] = None
+    tracking_no: Optional[str] = None
+    delivery_date: Optional[str] = None
+    received_by: Optional[str] = None
     delivery_notes: Optional[str] = None
 
 
@@ -450,8 +453,8 @@ async def get_job(job_id: str, user=Depends(current_user)):
         raise HTTPException(404, "Not found")
     if user["role"] == "customer" and j["customer_id"] != user["customer_id"]:
         raise HTTPException(403, "Forbidden")
-    # Technicians must not see commercial data
-    if user["role"] == "technician":
+    # Only admin and customer see commercial data (quotes, POs, revenue)
+    if user["role"] not in ("admin", "customer"):
         j.pop("quote", None)
     j["events"] = await db.job_events.find({"job_id": job_id}, {"_id": 0}).sort("at", -1).to_list(500)
     j["customer"] = await db.customers.find_one({"id": j["customer_id"]}, {"_id": 0})
@@ -497,7 +500,7 @@ async def job_assessment(job_id: str, data: AssessmentIn,
 
 @api.post("/jobs/{job_id}/quote")
 async def job_quote(job_id: str, data: QuoteIn,
-                    user=Depends(require_roles("admin", "coordinator"))):
+                    user=Depends(require_roles("admin"))):
     subtotal = sum(l.qty * l.unit_price for l in data.lines)
     tax = round(subtotal * data.tax_percent / 100, 2)
     total = round(subtotal + tax, 2)
@@ -521,6 +524,8 @@ async def job_quote_decide(job_id: str, data: QuoteDecisionIn, user=Depends(curr
     j = await db.repair_jobs.find_one({"id": job_id})
     if not j or not j.get("quote"):
         raise HTTPException(400, "No quote to decide")
+    if user["role"] not in ("admin", "customer"):
+        raise HTTPException(403, "Only admin or customer can decide on a quote")
     if user["role"] == "customer" and j["customer_id"] != user["customer_id"]:
         raise HTTPException(403, "Forbidden")
     quote = j["quote"]
@@ -561,7 +566,11 @@ async def job_dispatch(job_id: str, data: DispatchIn,
                        user=Depends(require_roles("admin", "coordinator"))):
     entry = {**data.model_dump(), "by": user["name"], "at": now_iso()}
     await _update_job(job_id, {"dispatch": entry, "status": "Dispatched"})
-    await _log_event(job_id, user, "Dispatched", f"{data.courier} • {data.tracking_no}")
+    if data.dispatch_method == "In Person":
+        note = f"In person to {data.received_by or '—'} on {data.delivery_date or '—'}"
+    else:
+        note = f"{data.courier or '—'} • {data.tracking_no or '—'}"
+    await _log_event(job_id, user, "Dispatched", note)
     return {"ok": True}
 
 
@@ -642,9 +651,9 @@ async def dashboard(user=Depends(current_user)):
         "closed_at": {"$gte": (datetime.now(timezone.utc).replace(day=1)).isoformat()}
     })
 
-    # revenue (approved quotes) — hidden from technicians
+    # revenue (approved quotes) — only admin and customer see commercial data
     revenue = 0
-    if user["role"] != "technician":
+    if user["role"] in ("admin", "customer"):
         pipeline_rev = [
             {"$match": {**scope, "quote.decision": "Approved"}},
             {"$group": {"_id": None, "total": {"$sum": "$quote.total"}}},
@@ -661,7 +670,7 @@ async def dashboard(user=Depends(current_user)):
         "total_jobs": total, "open_jobs": open_jobs, "ready_for_dispatch": ready,
         "awaiting_approval": awaiting_approval, "in_repair": in_repair,
         "closed_this_month": closed_this_month,
-        "revenue_approved": (round(revenue, 2) if user["role"] != "technician" else None),
+        "revenue_approved": (round(revenue, 2) if user["role"] in ("admin", "customer") else None),
         "customers": customers_ct, "assets": assets_ct,
         "by_status": by_status, "recent_jobs": recent,
     }
