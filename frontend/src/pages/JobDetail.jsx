@@ -31,6 +31,8 @@ export default function JobDetail() {
   if (!job) return <div className="p-10 text-muted-foreground">Loading…</div>;
 
   const canWork = ["admin","coordinator","technician","qa"].includes(user?.role);
+  const canSeeCommercials = ["admin","coordinator","customer"].includes(user?.role);
+  const canBuildQuote = ["admin","coordinator"].includes(user?.role);
   const isCust = user?.role === "customer";
 
   const act = async (path, body) => {
@@ -115,9 +117,9 @@ export default function JobDetail() {
             <AssessmentForm onSubmit={(v) => act("/assessment", v)} />
           )}
 
-          {job.quote && <QuoteView quote={job.quote} onDecide={(d) => act("/quote/decide", d)} canDecide={isCust || ["admin","coordinator"].includes(user?.role)} />}
+          {job.quote && canSeeCommercials && <QuoteView quote={job.quote} onDecide={(d) => act("/quote/decide", d)} canDecide={isCust || ["admin","coordinator"].includes(user?.role)} />}
 
-          {!job.quote && canWork && job.assessment?.outcome === "Repairable" && (
+          {!job.quote && canBuildQuote && job.assessment?.outcome === "Repairable" && (
             <QuoteForm onSubmit={(v) => act("/quote", v)} />
           )}
 

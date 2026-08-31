@@ -450,6 +450,9 @@ async def get_job(job_id: str, user=Depends(current_user)):
         raise HTTPException(404, "Not found")
     if user["role"] == "customer" and j["customer_id"] != user["customer_id"]:
         raise HTTPException(403, "Forbidden")
+    # Technicians must not see commercial data
+    if user["role"] == "technician":
+        j.pop("quote", None)
     j["events"] = await db.job_events.find({"job_id": job_id}, {"_id": 0}).sort("at", -1).to_list(500)
     j["customer"] = await db.customers.find_one({"id": j["customer_id"]}, {"_id": 0})
     return j
@@ -639,13 +642,15 @@ async def dashboard(user=Depends(current_user)):
         "closed_at": {"$gte": (datetime.now(timezone.utc).replace(day=1)).isoformat()}
     })
 
-    # revenue (approved quotes)
-    pipeline_rev = [
-        {"$match": {**scope, "quote.decision": "Approved"}},
-        {"$group": {"_id": None, "total": {"$sum": "$quote.total"}}},
-    ]
-    rev_docs = await db.repair_jobs.aggregate(pipeline_rev).to_list(1)
-    revenue = rev_docs[0]["total"] if rev_docs else 0
+    # revenue (approved quotes) — hidden from technicians
+    revenue = 0
+    if user["role"] != "technician":
+        pipeline_rev = [
+            {"$match": {**scope, "quote.decision": "Approved"}},
+            {"$group": {"_id": None, "total": {"$sum": "$quote.total"}}},
+        ]
+        rev_docs = await db.repair_jobs.aggregate(pipeline_rev).to_list(1)
+        revenue = rev_docs[0]["total"] if rev_docs else 0
 
     customers_ct = await db.customers.count_documents({})
     assets_ct = await db.assets.count_documents(scope if user["role"] == "customer" else {})
@@ -655,7 +660,8 @@ async def dashboard(user=Depends(current_user)):
     return {
         "total_jobs": total, "open_jobs": open_jobs, "ready_for_dispatch": ready,
         "awaiting_approval": awaiting_approval, "in_repair": in_repair,
-        "closed_this_month": closed_this_month, "revenue_approved": round(revenue, 2),
+        "closed_this_month": closed_this_month,
+        "revenue_approved": (round(revenue, 2) if user["role"] != "technician" else None),
         "customers": customers_ct, "assets": assets_ct,
         "by_status": by_status, "recent_jobs": recent,
     }

@@ -44,7 +44,9 @@ export default function Dashboard() {
         <Metric label="In Repair" value={d.in_repair} icon={TrendUp} testid="metric-repair" />
         <Metric label="Ready to Ship" value={d.ready_for_dispatch} icon={Package} testid="metric-ready" />
         <Metric label="Closed / MTD" value={d.closed_this_month} icon={CheckSquare} testid="metric-closed" />
-        <Metric label="Approved Revenue" value={`$${(d.revenue_approved || 0).toLocaleString()}`} icon={CurrencyDollar} testid="metric-revenue" />
+        {d.revenue_approved !== null && d.revenue_approved !== undefined && (
+          <Metric label="Approved Revenue" value={`$${(d.revenue_approved || 0).toLocaleString()}`} icon={CurrencyDollar} testid="metric-revenue" />
+        )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 mb-8">
