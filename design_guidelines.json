@@ -1,0 +1,157 @@
+{
+  "theme": "Dark/Light Toggle, default to Dark Mode for the internal CRM and Light Mode for the Customer Portal",
+  "typography": {
+    "headings": {
+      "fontFamily": "Cabinet Grotesk, sans-serif",
+      "strategy": "Swiss Brutalist mixed with Industrial Tech. Heavy weights (Bold/Black) for dashboard metrics, tracking-tight.",
+      "scales": {
+        "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter font-black",
+        "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold",
+        "h3": "text-xl sm:text-2xl tracking-tight font-semibold",
+        "h4": "text-lg sm:text-xl font-medium"
+      }
+    },
+    "body": {
+      "fontFamily": "IBM Plex Sans, sans-serif",
+      "strategy": "High legibility, structured, and technical.",
+      "scales": {
+        "base": "text-base leading-relaxed",
+        "small": "text-sm",
+        "xs": "text-xs uppercase tracking-[0.2em] text-muted-foreground"
+      }
+    },
+    "monospace": {
+      "fontFamily": "JetBrains Mono, monospace",
+      "strategy": "Mandatory for all identifiers: Serial Numbers, RMA IDs, Part Numbers, logs, and dates in tables.",
+      "scales": {
+        "base": "text-sm tabular-nums"
+      }
+    }
+  },
+  "colors": {
+    "archetype": "SWISS & HIGH-CONTRAST + THE PERFORMANCE PRO (Industrial variant)",
+    "palette": {
+      "primary": {
+        "internal": "#0055FF",
+        "portal": "#09090B"
+      },
+      "background": {
+        "dark": "#09090B",
+        "light": "#FFFFFF"
+      },
+      "surface": {
+        "dark": "#121214",
+        "light": "#F4F4F5"
+      },
+      "border": {
+        "dark": "rgba(255,255,255,0.1)",
+        "light": "rgba(0,0,0,0.1)"
+      },
+      "status": {
+        "Draft": "#71717A",
+        "Received": "#3B82F6",
+        "Assessment": "#EAB308",
+        "Quote": "#F97316",
+        "Repair": "#8B5CF6",
+        "QA": "#06B6D4",
+        "Dispatch": "#22C55E",
+        "Closed": "#14B8A6"
+      },
+      "text": {
+        "dark": "#FAFAFA",
+        "dark_muted": "#A1A1AA",
+        "light": "#09090B",
+        "light_muted": "#71717A"
+      }
+    },
+    "rules": [
+      "Use high-contrast borders to define density.",
+      "Base UI is monochrome. Color is strictly reserved for Status badges, Alerts, and Primary Actions.",
+      "Do NOT use 'Teal Green' or 'Purple Gradients' as the primary app color. Rely on Solid Klein Blue or deep grays."
+    ]
+  },
+  "visual_enhancers": {
+    "surfaces": {
+      "dashboard": "GRID BORDERS - Expose the grid for data-heavy sections (border-r, border-b with subtle opacity).",
+      "cards": "Flat solid background, 1px subtle border, no shadow. Hover states add `-translate-y-[1px]` and slight border darkening.",
+      "headers": "Solid Background with a hard 1px bottom border. Avoid glassmorphism in B2B CRMs as it causes visual noise."
+    },
+    "textures": [
+      "Subtle noise overlay (opacity 0.02) over the internal CRM to reduce digital glare and add an industrial, tactile feel."
+    ],
+    "icons": {
+      "library": "Phosphor Icons (@phosphor-icons/react)",
+      "style": "Regular or Duotone weight. Clean, highly legible at small sizes."
+    }
+  },
+  "component_strategy": {
+    "tables": "Data-dense. Use explicit 1px borders for rows, `tabular-nums` for numbers, and monospaced font for IDs. Include sticky headers.",
+    "status_chips": "Pill-shaped, uppercase, bold 11px font with high-contrast text and low-opacity backgrounds (e.g., bg-blue-500/10 text-blue-500).",
+    "stepper": "Linear, horizontal pipeline for RMA Job detail. Use 2px connecting lines and small solid dots. Active step is solid, past steps are checked, future steps are hollow.",
+    "forms": "Use Shadcn components. Left-align labels. Inputs should have subtle backgrounds (bg-muted/50) with focus rings that heavily contrast (ring-2 ring-primary).",
+    "tabs": "Underline style or solid block style. Do not use floating pill styles. Keep it utilitarian."
+  },
+  "grids": {
+    "dashboard": "MODE B: High Density Grid. grid-cols-1 md:grid-cols-4 lg:grid-cols-6. gap-4. Every pixel utilized. Children must be h-full.",
+    "details_page": "Bento-style layout. 2/3 column for main content (Job Details, Activity Log), 1/3 for context (Customer info, Equipment info, Actions).",
+    "spacing": "Use p-4 and p-6 for internal dashboard widgets. Use p-8 to p-12 for Customer Portal landing."
+  },
+  "layouts": {
+    "navigation": "Sidebar for internal CRM (dense, collapsible). Top nav for Customer Portal (simple, spacious).",
+    "job_detail": "Header with massive RMA ID (Monospace text-3xl) + Status Badge. Left column: Timeline/Workflow. Right column: Assessment/Quotation builder."
+  },
+  "motion": {
+    "interactions": "Sub-100ms transitions. Fast and responsive.",
+    "loading": "Skeleton states mimicking the exact grid layout, NOT spinners.",
+    "transitions": "transition-colors duration-150 for buttons/links. Avoid transform on grids."
+  },
+  "accessibility": {
+    "contrast": "Ensure all text meets 4.5:1 ratio.",
+    "testing": "All interactive elements MUST have data-testid attributes (e.g., data-testid='create-rma-btn').",
+    "focus": "Clear focus rings on all inputs/buttons (focus:ring-2 focus:outline-none)."
+  },
+  "media": {
+    "image_strategy": "Industrial, technical, raw photography. No illustrative vectors.",
+    "hero_overlay": "For customer portal login: bg-black/60 to ensure text readability."
+  },
+  "3d_libraries": {
+    "strategy": "Minimal. Avoid 3D in the internal CRM. Maybe a subtle Spline or TSParticles in the customer portal login screen for a premium touch, but only if performance allows."
+  },
+  "image_urls": [
+    {
+      "category": "Customer Portal Hero / Login Background",
+      "url": "https://images.unsplash.com/photo-1721332154191-ba5f1534266e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDZ8MHwxfHNlYXJjaHwyfHx0ZWNobmljaWFuJTIwcmVwYWlyaW5nJTIwY2lyY3VpdCUyMGJvYXJkfGVufDB8fHx8MTc4ODE0NzEyOXww&ixlib=rb-4.1.0&q=85",
+      "description": "Technician working on electronics"
+    },
+    {
+      "category": "Asset Representation / Dashboard Placeholder",
+      "url": "https://images.unsplash.com/photo-1776244956972-39528f6f19ea?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwyfHxlbGVjdHJvbmljJTIwY29udHJvbCUyMHVuaXR8ZW58MHx8fHwxNzg4MTQ3MTI5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Black electronic control module"
+    }
+  ],
+  "instructions_to_main_agent": [
+    "Install specific fonts: Cabinet Grotesk, IBM Plex Sans, JetBrains Mono.",
+    "Install Phosphor Icons: yarn add @phosphor-icons/react",
+    "Build the dashboard using a sidebar layout. Prioritize information density and crisp borders over soft shadows.",
+    "Ensure all identifiers (RMA numbers, Serial Numbers) use the monospace font class.",
+    "Use standard Shadcn components for forms, tables, and dialogs, but customize them by removing border-radius to enforce the industrial look.",
+    "Implement Sonner for toast notifications."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms.",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file. This disrupts the human natural reading flow of text.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable for marketing/portal parts, but keep the CRM dense and structured.",
+    "Main agent relies on these image URLs. Missing categories = main agent will use placeholder text which is FORBIDDEN.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Use `sonner` for toasts.",
+    "DO NOT use complete `transparent` background in header, overlays, any surface that has content under it.",
+    "All interactive and key informational elements MUST include a `data-testid` attribute to facilitate robust automated testing."
+  ]
+}

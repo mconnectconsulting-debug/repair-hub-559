@@ -1,0 +1,46 @@
+{
+  "summary": "First-finish smoke testing of MConnect repair CRM. Backend auth/RBAC/dashboard/inventory/full-lifecycle validated with real API. Frontend admin flows (login, dashboard metrics, RMAs create, jobs filters, nav pages, logout, portal login) validated. One functional frontend bug found: Customer Portal shows 0 jobs though backend GET /api/jobs (customer token) returns 4 jobs. Two spec-vs-code mismatches surfaced.",
+  "tested_scope": ["backend","frontend","auth","integration","rbac"],
+  "passed": [
+    "POST /api/auth/login for admin & customer returns 200 with `token` and user object",
+    "GET /api/auth/me returns user (role admin)",
+    "GET /api/dashboard returns required keys (total_jobs, open_jobs, awaiting_approval, in_repair, ready_for_dispatch, revenue_approved, by_status, recent_jobs). Unauth returns 401",
+    "Customer role scoping: GET /api/jobs returns only SBS jobs (customer_id f839ff17...); POST /api/customers=403; GET /api/inventory=403",
+    "RBAC: Technician POST /jobs/{id}/qa returns 403",
+    "POST /api/rmas creates RMA (RMA-2026-00007) with 1 job (JOB-2026-00007), reuses/creates asset from serial",
+    "Full job lifecycle transitions Submitted -> Received -> (quote) Awaiting Approval -> Repair In Progress -> QA -> Ready for Dispatch -> Dispatched -> Closed; events log contains 7 entries",
+    "Inventory: POST /api/inventory create; POST /api/inventory/txn Receipt 10 then Issue 5 -> on_hand=5; Issue 100 -> 400 Insufficient stock",
+    "Frontend: admin login redirects to /app; dashboard metrics metric-open/approval/repair/ready/closed/revenue all present; dashboard-recent-table has 8 rows",
+    "Frontend RMAs: rma-table shows 7 seed rows; new-rma-btn opens dialog; submitting rma-item-serial-0 + rma-item-fault-0 navigates to /app/rmas/{id} and rma-detail-jobs shows 1 job",
+    "Frontend Jobs: jobs-table loads (8 rows), 11 job-filter-* buttons present and filter works",
+    "Frontend nav-customers, nav-assets, nav-inventory load their pages",
+    "Frontend logout-btn returns to /login; demo-login-customer redirects to /portal; portal-jobs-table renders"
+  ],
+  "failed": [
+    {
+      "area": "Frontend Customer Portal (integration)",
+      "issue": "Customer Portal shows 'No repair jobs yet' and all metric cards = 0, but backend GET /api/jobs (with customer token) returns 4 jobs for SBS. portal-approve-* buttons therefore never render, breaking the quote-approval flow test in the review.",
+      "evidence": "Screenshot after demo-login-customer: 'No repair jobs yet'; portal-jobs-table tbody has 1 placeholder row; portal-approve buttons count=0. Yet: curl GET /api/jobs (cust token) returns 4 jobs.",
+      "priority": "HIGH"
+    },
+    {
+      "area": "Spec vs backend payload mismatch (documentation)",
+      "issue": "Review request describes assessment payload {outcome:'Repairable'} and test payload {result:'Pass'}, but backend requires visual_check/electrical_check/pcb_check/comms_check/diagnosis/root_cause for /assessment and test_type/procedure for /test (returns 422). Lifecycle still completes because other transitions don't strictly depend on assessment record. Frontend forms likely provide all fields — worth confirming.",
+      "evidence": "422 payload from POST /jobs/{id}/assessment with minimal body; same for /test",
+      "priority": "LOW"
+    },
+    {
+      "area": "Spec vs frontend testid mismatch (documentation)",
+      "issue": "Review references data-testid 'nav-jobs' but Layout.jsx generates 'nav-repair-jobs' (label='Repair Jobs' -> nav-repair-jobs). Real testid works fine.",
+      "evidence": "grep Layout.jsx line 41 template literal; DOM has nav-repair-jobs",
+      "priority": "LOW"
+    }
+  ],
+  "action_items": [
+    "Investigate why CustomerPortal.jsx renders 0 jobs though backend returns 4 for the customer token — likely wrong API path, wrong field in response, missing Authorization header on portal fetch, or client-side filter bug.",
+    "Optionally update review-request docs: assessment/test payloads and the nav-repair-jobs testid."
+  ],
+  "success_rate": {"backend": "100%", "frontend": "~85% (portal jobs integration broken)"},
+  "retest_needed": true,
+  "full_testing_deferred": true
+}
