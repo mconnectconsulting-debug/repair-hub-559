@@ -249,6 +249,30 @@ class StockTxnIn(BaseModel):
     reason: Optional[str] = None
 
 
+ROLES = ("admin", "coordinator", "technician", "qa", "customer")
+
+
+class UserIn(BaseModel):
+    email: EmailStr
+    name: str = Field(min_length=2, max_length=200)
+    role: Literal["admin", "coordinator", "technician", "qa", "customer"]
+    password: str = Field(min_length=6, max_length=128)
+    customer_id: Optional[str] = None
+    is_active: bool = True
+
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    name: Optional[str] = Field(default=None, min_length=2, max_length=200)
+    role: Optional[Literal["admin", "coordinator", "technician", "qa", "customer"]] = None
+    customer_id: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class PasswordResetIn(BaseModel):
+    password: str = Field(min_length=6, max_length=128)
+
+
 # ============ AUTH ============
 @api.post("/auth/login")
 async def login(payload: LoginIn):
@@ -743,9 +767,130 @@ async def dashboard(user=Depends(current_user)):
 
 
 # ============ USERS (admin) ============
+def _user_public(u: dict) -> dict:
+    """Strip sensitive fields from user document before returning."""
+    return {k: v for k, v in u.items() if k not in ("_id", "password_hash")}
+
+
 @api.get("/users")
-async def list_users(user=Depends(require_roles("admin", "coordinator"))):
-    return await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(500)
+async def list_users(role: Optional[str] = None, user=Depends(current_user)):
+    # Admin: full user list (with role filter)
+    # Coordinator: allowed to query technicians only (needed to populate the
+    # assign-technician dropdown in the job detail view). No other read access.
+    if user["role"] == "admin":
+        q = {}
+        if role:
+            if role not in ROLES:
+                raise HTTPException(400, "Invalid role")
+            q["role"] = role
+        docs = await db.users.find(q, {"_id": 0, "password_hash": 0}).to_list(1000)
+        return docs
+    if user["role"] == "coordinator":
+        if role and role != "technician":
+            raise HTTPException(403, "Not permitted")
+        docs = await db.users.find(
+            {"role": "technician", "is_active": True},
+            {"_id": 0, "password_hash": 0}
+        ).to_list(1000)
+        # only the minimal fields needed by the assign dropdown
+        return [{"id": d["id"], "name": d["name"], "role": d["role"]} for d in docs]
+    raise HTTPException(403, "Not permitted")
+
+
+@api.post("/users")
+async def create_user(data: UserIn, user=Depends(require_roles("admin"))):
+    email = data.email.lower().strip()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(409, f"A user with email '{email}' already exists")
+    if data.role == "customer":
+        if not data.customer_id:
+            raise HTTPException(400, "customer_id is required when role is 'customer'")
+        if not await db.customers.find_one({"id": data.customer_id}):
+            raise HTTPException(400, "customer_id does not reference an existing customer")
+    doc = {
+        "id": new_id(),
+        "email": email,
+        "name": data.name.strip(),
+        "role": data.role,
+        "password_hash": hash_pw(data.password),
+        "customer_id": data.customer_id if data.role == "customer" else None,
+        "is_active": data.is_active,
+        "created_at": now_iso(),
+    }
+    await db.users.insert_one(doc)
+    return _user_public(doc)
+
+
+@api.put("/users/{user_id}")
+async def update_user(user_id: str, data: UserUpdate,
+                      user=Depends(require_roles("admin"))):
+    existing = await db.users.find_one({"id": user_id})
+    if not existing:
+        raise HTTPException(404, "User not found")
+    patch = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+
+    if "email" in patch:
+        patch["email"] = patch["email"].lower().strip()
+        dup = await db.users.find_one({"email": patch["email"], "id": {"$ne": user_id}})
+        if dup:
+            raise HTTPException(409, f"A user with email '{patch['email']}' already exists")
+
+    if "name" in patch:
+        patch["name"] = patch["name"].strip()
+
+    # Determine effective role after this update
+    new_role = patch.get("role", existing["role"])
+
+    # Role change safety: cannot demote the last active admin
+    if existing["role"] == "admin" and new_role != "admin":
+        other_admins = await db.users.count_documents(
+            {"role": "admin", "is_active": True, "id": {"$ne": user_id}}
+        )
+        if other_admins == 0:
+            raise HTTPException(400, "Cannot change the role of the last active admin")
+
+    # Deactivation safety: cannot deactivate self or the last active admin
+    if patch.get("is_active") is False:
+        if user_id == user["id"]:
+            raise HTTPException(400, "You cannot deactivate your own account")
+        if existing["role"] == "admin" and new_role == "admin":
+            other_admins = await db.users.count_documents(
+                {"role": "admin", "is_active": True, "id": {"$ne": user_id}}
+            )
+            if other_admins == 0:
+                raise HTTPException(400, "Cannot deactivate the last active admin")
+
+    # customer_id sanity: required if new role is customer; cleared otherwise
+    if new_role == "customer":
+        cid = patch.get("customer_id", existing.get("customer_id"))
+        if not cid:
+            raise HTTPException(400, "customer_id is required when role is 'customer'")
+        if not await db.customers.find_one({"id": cid}):
+            raise HTTPException(400, "customer_id does not reference an existing customer")
+        patch["customer_id"] = cid
+    else:
+        # non-customer roles must not carry a customer_id linkage
+        patch["customer_id"] = None
+
+    if not patch:
+        raise HTTPException(400, "No fields to update")
+    patch["updated_at"] = now_iso()
+    await db.users.update_one({"id": user_id}, {"$set": patch})
+    updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    return updated
+
+
+@api.post("/users/{user_id}/reset-password")
+async def reset_user_password(user_id: str, data: PasswordResetIn,
+                              user=Depends(require_roles("admin"))):
+    existing = await db.users.find_one({"id": user_id})
+    if not existing:
+        raise HTTPException(404, "User not found")
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"password_hash": hash_pw(data.password), "password_reset_at": now_iso()}}
+    )
+    return {"ok": True}
 
 
 # ============ SEED ============

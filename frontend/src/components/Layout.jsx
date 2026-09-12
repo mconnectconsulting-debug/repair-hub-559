@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import {
   Gauge, Users, Cpu, Package, ClipboardText, Wrench,
-  SignOut, ShieldCheck,
+  SignOut, ShieldCheck, UsersFour,
 } from "@phosphor-icons/react";
 
 const NAV = [
@@ -13,6 +13,7 @@ const NAV = [
   { to: "/app/customers", label: "Customers", icon: Users },
   { to: "/app/assets", label: "Assets", icon: Cpu },
   { to: "/app/inventory", label: "Inventory", icon: Package, roles: ["admin","coordinator","technician"] },
+  { to: "/app/users", label: "Users", icon: UsersFour, roles: ["admin"] },
 ];
 
 export default function Layout() {

@@ -12,6 +12,7 @@ import JobDetail from "@/pages/JobDetail";
 import Customers from "@/pages/Customers";
 import Assets from "@/pages/Assets";
 import Inventory from "@/pages/Inventory";
+import Users from "@/pages/Users";
 import CustomerPortal from "@/pages/CustomerPortal";
 
 function Root() {
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="customers" element={<Customers />} />
             <Route path="assets" element={<Assets />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="users" element={<Guard roles={["admin"]}><Users /></Guard>} />
           </Route>
         </Routes>
       </BrowserRouter>

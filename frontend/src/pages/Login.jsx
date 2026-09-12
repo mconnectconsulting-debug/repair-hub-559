@@ -4,6 +4,8 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Wrench } from "@phosphor-icons/react";
 
+const SHOW_DEMO = process.env.REACT_APP_SHOW_DEMO !== "false";
+
 const DEMO = [
   { label: "Admin", email: "admin@mconnect.demo", password: "admin123" },
   { label: "Coordinator", email: "coord@mconnect.demo", password: "coord123" },
@@ -103,20 +105,28 @@ export default function Login() {
           </form>
 
           <div className="mt-10 pt-6 border-t border-border">
-            <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Quick demo access</div>
-            <div className="grid grid-cols-2 gap-2">
-              {DEMO.map((d) => (
-                <button
-                  key={d.email}
-                  data-testid={`demo-login-${d.label.toLowerCase()}`}
-                  onClick={() => quick(d)}
-                  className="text-left px-3 py-2 bg-muted/40 hover:bg-muted border border-border rounded-md text-sm transition-colors duration-100"
-                >
-                  <div className="font-medium">{d.label}</div>
-                  <div className="font-mono text-[11px] text-muted-foreground truncate">{d.email}</div>
-                </button>
-              ))}
-            </div>
+            {SHOW_DEMO ? (
+              <>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-3">Quick demo access</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {DEMO.map((d) => (
+                    <button
+                      key={d.email}
+                      data-testid={`demo-login-${d.label.toLowerCase()}`}
+                      onClick={() => quick(d)}
+                      className="text-left px-3 py-2 bg-muted/40 hover:bg-muted border border-border rounded-md text-sm transition-colors duration-100"
+                    >
+                      <div className="font-medium">{d.label}</div>
+                      <div className="font-mono text-[11px] text-muted-foreground truncate">{d.email}</div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                Ask your administrator for access
+              </div>
+            )}
           </div>
         </div>
       </div>
