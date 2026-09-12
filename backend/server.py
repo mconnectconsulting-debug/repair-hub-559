@@ -112,9 +112,18 @@ class LoginIn(BaseModel):
 
 
 class CustomerIn(BaseModel):
-    name: str
-    code: str
+    name: str = Field(min_length=2, max_length=200)
+    code: str = Field(min_length=2, max_length=32)
     industry: Optional[str] = "Transport"
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    address: Optional[str] = None
+
+
+class CustomerUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2, max_length=200)
+    code: Optional[str] = Field(default=None, min_length=2, max_length=32)
+    industry: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     address: Optional[str] = None
@@ -275,9 +284,66 @@ async def list_customers(user=Depends(current_user)):
 
 @api.post("/customers")
 async def create_customer(data: CustomerIn, user=Depends(require_roles("admin", "coordinator"))):
-    doc = {"id": new_id(), **data.model_dump(), "created_at": now_iso()}
+    code = data.code.strip().upper()
+    if await db.customers.find_one({"code": code}):
+        raise HTTPException(409, f"Customer code '{code}' already exists")
+    doc = {
+        "id": new_id(),
+        **data.model_dump(),
+        "code": code,
+        "name": data.name.strip(),
+        "created_at": now_iso(),
+    }
     await db.customers.insert_one(doc)
     return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@api.put("/customers/{customer_id}")
+async def update_customer(customer_id: str, data: CustomerUpdate,
+                          user=Depends(require_roles("admin", "coordinator"))):
+    existing = await db.customers.find_one({"id": customer_id})
+    if not existing:
+        raise HTTPException(404, "Customer not found")
+    patch = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    if "code" in patch:
+        patch["code"] = patch["code"].strip().upper()
+        dup = await db.customers.find_one({"code": patch["code"], "id": {"$ne": customer_id}})
+        if dup:
+            raise HTTPException(409, f"Customer code '{patch['code']}' already exists")
+    if "name" in patch:
+        patch["name"] = patch["name"].strip()
+    if not patch:
+        raise HTTPException(400, "No fields to update")
+    patch["updated_at"] = now_iso()
+    await db.customers.update_one({"id": customer_id}, {"$set": patch})
+    updated = await db.customers.find_one({"id": customer_id}, {"_id": 0})
+    return updated
+
+
+@api.delete("/customers/{customer_id}")
+async def delete_customer(customer_id: str, user=Depends(require_roles("admin"))):
+    existing = await db.customers.find_one({"id": customer_id})
+    if not existing:
+        raise HTTPException(404, "Customer not found")
+    # Prevent delete if any related records exist (referential safety).
+    refs = {
+        "depots":       await db.depots.count_documents({"customer_id": customer_id}),
+        "vehicles":     await db.vehicles.count_documents({"customer_id": customer_id}),
+        "assets":       await db.assets.count_documents({"customer_id": customer_id}),
+        "rmas":         await db.rmas.count_documents({"customer_id": customer_id}),
+        "repair_jobs":  await db.repair_jobs.count_documents({"customer_id": customer_id}),
+        "users":        await db.users.count_documents({"customer_id": customer_id}),
+    }
+    blocking = {k: v for k, v in refs.items() if v > 0}
+    if blocking:
+        summary = ", ".join(f"{v} {k}" for k, v in blocking.items())
+        raise HTTPException(
+            409,
+            f"Cannot delete '{existing['name']}': customer is referenced by {summary}. "
+            "Remove or reassign these records before deleting."
+        )
+    await db.customers.delete_one({"id": customer_id})
+    return {"ok": True, "deleted": customer_id}
 
 
 @api.get("/depots")
